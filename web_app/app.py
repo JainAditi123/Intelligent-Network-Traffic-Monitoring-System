@@ -8,6 +8,7 @@ Then open http://127.0.0.1:5000
 
 import io
 import os
+import sys
 import json
 import pathlib
 import datetime
@@ -15,6 +16,11 @@ import pandas as pd
 from flask import (
     Flask, render_template, request, jsonify, redirect, url_for, send_file, Response
 )
+
+# Ensure web_app directory is on sys.path regardless of execution root
+_WEB_APP_DIR = os.path.dirname(os.path.abspath(__file__))
+if _WEB_APP_DIR not in sys.path:
+    sys.path.insert(0, _WEB_APP_DIR)
 
 from predictor import (
     get_feature_names,
