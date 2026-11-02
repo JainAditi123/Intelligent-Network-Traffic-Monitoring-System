@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}DDoS Monitor{% endblock %} | Network Traffic Monitor</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+<!-- ── Sidebar Navigation ── -->
+<nav class="sidebar">
+  <div class="sidebar-brand">
+    <span class="brand-icon">🛡️</span>
+    <div>
+      <div class="brand-title">DDoS Monitor</div>
+      <div class="brand-sub">CIC-DDoS2019 · Ensemble ML</div>
+    </div>
+  </div>
+
+  <ul class="nav-links">
+    <li class="{{ 'active' if request.endpoint == 'dashboard' else '' }}">
+      <a href="{{ url_for('dashboard') }}">
+        <span class="nav-icon">📊</span> Dashboard
+      </a>
+    </li>
+    <li class="{{ 'active' if request.endpoint == 'predict' else '' }}">
+      <a href="{{ url_for('predict') }}">
+        <span class="nav-icon">🔍</span> Traffic Prediction
+      </a>
+    </li>
+    <li class="{{ 'active' if request.endpoint == 'comparison' else '' }}">
+      <a href="{{ url_for('comparison') }}">
+        <span class="nav-icon">📈</span> Model Comparison
+      </a>
+    </li>
+    <li class="{{ 'active' if request.endpoint == 'evaluation' else '' }}">
+      <a href="{{ url_for('evaluation') }}">
+        <span class="nav-icon">🧮</span> Evaluation
+      </a>
+    </li>
+    <li class="{{ 'active' if request.endpoint == 'about' else '' }}">
+      <a href="{{ url_for('about') }}">
+        <span class="nav-icon">ℹ️</span> About
+      </a>
+    </li>
+  </ul>
+
+  <div class="sidebar-footer">
+    <div class="badge-note">Binary Classification Only</div>
+    <div class="badge-note">BENIGN vs ATTACK</div>
+  </div>
+</nav>
+
+<!-- ── Main Content ── -->
+<main class="main-content">
+  <div class="top-bar">
+    <h1 class="page-title">{% block page_title %}{% endblock %}</h1>
+    <div class="top-bar-right">
+      {% if load_status and load_status.success %}
+      <span class="status-dot"></span>
+      <span class="status-text" style="color:var(--accent2); font-weight:600;">{{ load_status.status_text }}</span>
+      {% else %}
+      <span class="status-dot" style="background:var(--danger); animation:none;"></span>
+      <span class="status-text" style="color:var(--danger); font-weight:600;">{{ load_status.error_message if load_status else 'Artifact Load Error' }}</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="content-body">
+    {% block content %}{% endblock %}
+  </div>
+</main>
+
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

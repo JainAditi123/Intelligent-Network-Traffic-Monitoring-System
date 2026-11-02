@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Evaluation{% endblock %}
+{% block page_title %}Model Evaluation & Confusion Matrices{% endblock %}
+
+{% block content %}
+
+<!-- ── Leakage Audit Banner ── -->
+<div class="alert-banner warning-banner">
+  <span class="alert-icon">⚠️</span>
+  <strong>Scientific Rigor — Methodology Transparency:</strong>
+  In the baseline experiment, feature selection (04_feature_selection.py) was performed on the full dataset before the 80/20 train-test split, introducing a selection bias.
+  An independent leakage-free audit (<code>leakage_free_evaluation.py</code>) confirmed that 27 of 30 top features are identical when selection is restricted strictly to training data, yielding consistent >99.84% accuracy.
+</div>
+
+<!-- ── Confusion Matrix Legend & Metrics Explanation ── -->
+<div class="section-title">Understanding Confusion Matrix Terminology</div>
+<div class="cm-legend-grid">
+  <div class="cm-legend-card cm-tn">
+    <div class="cm-abbr">TN</div>
+    <div class="cm-full">True Negative</div>
+    <div class="cm-desc">BENIGN traffic correctly identified as safe.<br><strong>Result:</strong> Normal user sessions uninterrupted.</div>
+  </div>
+  <div class="cm-legend-card cm-fp">
+    <div class="cm-abbr">FP</div>
+    <div class="cm-full">False Positive (False Alarm)</div>
+    <div class="cm-desc">BENIGN traffic incorrectly flagged as an attack.<br><strong>Security Impact:</strong> Legitimate users wrongly blocked.</div>
+  </div>
+  <div class="cm-legend-card cm-fn">
+    <div class="cm-abbr">FN</div>
+    <div class="cm-full">False Negative (Missed Attack)</div>
+    <div class="cm-desc">ATTACK traffic missed and classified as BENIGN.<br><strong>Security Impact:</strong> Server overwhelm & downtime.</div>
+  </div>
+  <div class="cm-legend-card cm-tp">
+    <div class="cm-abbr">TP</div>
+    <div class="cm-full">True Positive</div>
+    <div class="cm-desc">DDoS attack flow correctly detected and flagged.<br><strong>Result:</strong> Attack identified for mitigation.</div>
+  </div>
+</div>
+
+<!-- ── Test Set Ground Truth Verification ── -->
+<div class="about-card" style="margin-top:14px;">
+  <div style="font-weight:700; color:var(--text-bright); margin-bottom:6px;">Ground Truth Verification (Held-out Test Partition)</div>
+  <div style="font-size:0.88rem; color:var(--text-muted); line-height:1.6;">
+    Total Test Samples: <strong>{{ "{:,}".format(stats.test_split_samples) }}</strong> (20% stratified sample of 426,076 total records).<br>
+    Actual BENIGN flows (Class 0): <strong>{{ "{:,}".format(stats.test_benign) }}</strong> (22.2%) = TN + FP for every model.<br>
+    Actual ATTACK flows (Class 1): <strong>{{ "{:,}".format(stats.test_attack) }}</strong> (77.8%) = FN + TP for every model.
+  </div>
+</div>
+
+<!-- ── Confusion Matrices Grid ── -->
+<div class="section-title">Confusion Matrices (5 Models Evaluated on Test Set)</div>
+
+{% for r in results %}
+<div class="cm-section">
+  <div class="cm-model-header" style="border-left:4px solid {{ r.color }};">
+    <span class="cm-model-icon">{{ r.icon }}</span>
+    <span class="cm-model-name">{{ r.name }}</span>
+    <span class="cm-model-type">{{ r.type }}</span>
+  </div>
+  <div class="cm-body">
+    <!-- Matrix display -->
+    <div class="cm-grid">
+      <div class="cm-axis-label top-axis">PREDICTED CLASS</div>
+      <div class="cm-axis-label left-axis">ACTUAL CLASS</div>
+
+      <div class="cm-col-label">BENIGN (0)</div>
+      <div class="cm-col-label">ATTACK (1)</div>
+
+      <div class="cm-row-label">BENIGN (0)</div>
+      <div class="cm-cell cm-tn-cell" title="True Negative (Correct Benign)">
+        <div class="cm-cell-val">{{ "{:,}".format(r.cm.tn) }}</div>
+        <div class="cm-cell-lbl">TN (Correct Benign)</div>
+      </div>
+      <div class="cm-cell cm-fp-cell" title="False Positive (False Alarm)">
+        <div class="cm-cell-val">{{ "{:,}".format(r.cm.fp) }}</div>
+        <div class="cm-cell-lbl">FP (False Alarm)</div>
+      </div>
+
+      <div class="cm-row-label">ATTACK (1)</div>
+      <div class="cm-cell cm-fn-cell" title="False Negative (Missed Attack)">
+        <div class="cm-cell-val">{{ "{:,}".format(r.cm.fn) }}</div>
+        <div class="cm-cell-lbl">FN (Missed Attack)</div>
+      </div>
+      <div class="cm-cell cm-tp-cell" title="True Positive (Detected Attack)">
+        <div class="cm-cell-val">{{ "{:,}".format(r.cm.tp) }}</div>
+        <div class="cm-cell-lbl">TP (Detected Attack)</div>
+      </div>
+    </div>
+
+    <!-- Per-model metrics breakdown -->
+    <div class="cm-metrics">
+      <div class="cm-metric-row">
+        <span class="cm-metric-label">Accuracy:</span>
+        <span class="cm-metric-val">{{ "%.4f"|format(r.accuracy) }} ({{ "%.2f"|format(r.accuracy * 100) }}%)</span>
+      </div>
+      <div class="cm-metric-row">
+        <span class="cm-metric-label">Precision (TP / [TP+FP]):</span>
+        <span class="cm-metric-val">{{ "%.4f"|format(r.precision) }}</span>
+      </div>
+      <div class="cm-metric-row">
+        <span class="cm-metric-label">Recall / Sensitivity (TP / [TP+FN]):</span>
+        <span class="cm-metric-val">{{ "%.4f"|format(r.recall) }}</span>
+      </div>
+      <div class="cm-metric-row">
+        <span class="cm-metric-label">F1-Score:</span>
+        <span class="cm-metric-val" style="color:{{ r.color }};">{{ "%.4f"|format(r.f1) }}</span>
+      </div>
+      <div class="cm-metric-row">
+        <span class="cm-metric-label">Benign Specificity (TN / [TN+FP]):</span>
+        <span class="cm-metric-val">{{ "%.4f"|format(r.cm.tn / (r.cm.tn + r.cm.fp)) }}</span>
+      </div>
+      <div class="cm-metric-row">
+        <span class="cm-metric-label">False Positive Rate (FPR):</span>
+        <span class="cm-metric-val" style="color:{{ '#00d4aa' if r.cm.fp < 10 else '#f4a261' }};">
+          {{ "%.4f"|format(r.cm.fp / (r.cm.tn + r.cm.fp)) }} ({{ r.cm.fp }} alerts)
+        </span>
+      </div>
+      <div class="cm-metric-row">
+        <span class="cm-metric-label">False Negative Rate (FNR):</span>
+        <span class="cm-metric-val" style="color:{{ '#00d4aa' if r.cm.fn <= 46 else '#f72585' }};">
+          {{ "%.4f"|format(r.cm.fn / (r.cm.fn + r.cm.tp)) }} ({{ r.cm.fn }} missed)
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{% endblock %}

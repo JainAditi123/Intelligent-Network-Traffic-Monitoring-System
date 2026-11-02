@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}About{% endblock %}
+{% block page_title %}About the Project & Technical Specifications{% endblock %}
+
+{% block content %}
+
+<!-- ── Hero Banner ── -->
+<div class="about-hero">
+  <div class="about-shield">🛡️</div>
+  <div>
+    <h2 class="about-title">Develop Intelligent Network Traffic Monitoring System</h2>
+    <p class="about-subtitle">Using the CIC-DDoS2019 Dataset and Ensemble Machine Learning Architectures</p>
+  </div>
+</div>
+
+<!-- ── Problem Statement & Objectives ── -->
+<div class="section-title">1. Problem Statement & Research Objectives</div>
+<div class="about-card">
+  <p style="margin-bottom:12px; line-height:1.6;">
+    <strong>The Problem:</strong> Distributed Denial-of-Service (DDoS) attacks overwhelm server resources, causing service outages that cost modern enterprises upwards of $20,000–$40,000 per hour. Traditional signature-based firewalls fail against polymorphic attacks, and manual traffic analysis cannot scale to millions of flows per second.
+  </p>
+  <p style="margin-bottom:10px; font-weight:700; color:var(--accent);">Core Objectives:</p>
+  <ul class="about-list">
+    <li>Implement an automated binary classification system to accurately detect DDoS traffic flows (<code>BENIGN</code> vs. <code>ATTACK</code>).</li>
+    <li>Evaluate single-tree baseline models (Decision Tree) against modern ensemble paradigms (Random Forest, XGBoost, Soft Voting, and Stacking).</li>
+    <li>Validate whether ensemble meta-learning yields superior sensitivity (lowest missed attacks) compared to standalone classifiers.</li>
+    <li>Ensure scientific transparency through reproducible preprocessing, SMOTE class balancing, and an empirical data leakage audit.</li>
+    <li>Provide an interactive web demonstration dashboard with real CSV prediction and calibrated confidence scores.</li>
+  </ul>
+</div>
+
+<!-- ── Implemented vs. Planned Scope ── -->
+<div class="section-title">2. Operational Scope & Implementation Boundaries</div>
+<div class="about-card scope-card">
+  <div class="scope-col in-scope">
+    <div class="scope-header in">✅ Implemented Features (Operational)</div>
+    <ul>
+      <li>Binary classification: <code>BENIGN</code> vs <code>ATTACK</code>.</li>
+      <li>Five supervised ML models (DT, RF, XGBoost, Voting, Stacking).</li>
+      <li>Fitted <code>StandardScaler</code> & SMOTE balancing on training data.</li>
+      <li>Batch CSV flow record prediction with validation.</li>
+      <li>Calibrated confidence scoring via meta-learner probability output.</li>
+      <li>Downloadable CSV results with timestamps & threat badges.</li>
+      <li>Leakage-free audit script (<code>leakage_free_evaluation.py</code>).</li>
+    </ul>
+  </div>
+  <div class="scope-col out-scope">
+    <div class="scope-header out">⚙️ Planned Future Scope (Not Implemented)</div>
+    <ul>
+      <li>Live kernel-level packet sniffing (e.g. Scapy/libpcap live wiretap).</li>
+      <li>Attack-family classification (e.g. distinguishing DNS from SYN).</li>
+      <li>Automated active firewall rule injection (iptables/eBPF blocking).</li>
+      <li>Deep learning recurrent architectures (LSTM / Transformers).</li>
+      <li>Distributed deployment across multi-cloud streaming pipelines.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ── Dataset Specifications ── -->
+<div class="section-title">3. Dataset Specifications (CIC-DDoS2019)</div>
+<div class="about-card">
+  <div class="info-row"><span class="info-key">Benchmark:</span><span class="info-val">Canadian Institute for Cybersecurity DDoS 2019 Dataset</span></div>
+  <div class="info-row"><span class="info-key">Total Cleaned Records:</span><span class="info-val">{{ "{:,}".format(stats.total_cleaned_samples) }} flow records across 17 Parquet source files</span></div>
+  <div class="info-row"><span class="info-key">Raw Feature Count:</span><span class="info-val">88 statistical flow features reduced to 30 selected features</span></div>
+  <div class="info-row"><span class="info-key">Attack Scenarios:</span><span class="info-val">11 attack types: DNS, LDAP, MSSQL, NetBIOS, NTP, Portmap, SNMP, SYN, TFTP, UDP, UDPLag</span></div>
+  <div class="info-row"><span class="info-key">Training Partition:</span><span class="info-val">{{ "{:,}".format(stats.train_split_pre_smote) }} original flows &rarr; {{ "{:,}".format(stats.train_samples_post_smote) }} balanced post-SMOTE flows</span></div>
+  <div class="info-row"><span class="info-key">Held-out Test Partition:</span><span class="info-val">{{ "{:,}".format(stats.test_split_samples) }} samples ({{ "{:,}".format(stats.test_benign) }} Benign, {{ "{:,}".format(stats.test_attack) }} Attack)</span></div>
+</div>
+
+<!-- ── The 30 Selected Features ── -->
+<div class="section-title">4. Selected Network Flow Features (30 Features)</div>
+<div class="feature-grid" style="margin-bottom:16px;">
+  {% for f in features %}
+  <div class="feature-chip">{{ loop.index }}. {{ f }}</div>
+  {% endfor %}
+</div>
+
+<!-- ── Machine Learning Architectures ── -->
+<div class="section-title">5. Ensemble Learning Architectures</div>
+<div class="about-card">
+  <div style="margin-bottom:14px;">
+    <strong style="color:var(--accent);">1. Decision Tree (Baseline):</strong> Single recursive binary splitting tree based on Gini impurity. Fast and interpretable, but exhibits higher false alarms (FP=22).
+  </div>
+  <div style="margin-bottom:14px;">
+    <strong style="color:var(--accent2);">2. Random Forest (Bagging):</strong> An ensemble of 100 decision trees trained on bootstrap samples with random feature subsets. Aggregation by majority voting significantly reduces predictive variance (FP=9, FN=49).
+  </div>
+  <div style="margin-bottom:14px;">
+    <strong style="color:#f4a261;">3. XGBoost (Gradient Boosting):</strong> Sequentially built shallow trees (depth 6) where each tree optimizes a pseudo-residual loss function. Achieves the lowest false alarms (FP=4) and 0.9999 precision.
+  </div>
+  <div style="margin-bottom:14px;">
+    <strong style="color:#a78bfa;">4. Voting Ensemble (Soft Voting):</strong> Computes the unweighted arithmetic mean of predicted class probabilities across DT, RF, and XGBoost: <code>P(c) = (P_DT + P_RF + P_XGB) / 3</code>.
+  </div>
+  <div>
+    <strong style="color:var(--danger);">5. Stacking Ensemble (Meta-Learning):</strong> Employs DT, RF, and XGBoost as Level-0 base learners. Their cross-validated out-of-fold probability outputs serve as meta-features for a Level-1 Logistic Regression classifier. This model optimizes decision boundaries to achieve the lowest missed attacks among ensembles (FN=46, Accuracy=0.9994).
+  </div>
+</div>
+
+<!-- ── Technologies Used ── -->
+<div class="section-title">6. Technology Stack & Component Versions</div>
+<div class="tech-grid">
+  <div class="tech-card"><div class="tech-icon">🐍</div><div class="tech-name">Python 3</div></div>
+  <div class="tech-card"><div class="tech-icon">🧠</div><div class="tech-name">scikit-learn 1.9</div></div>
+  <div class="tech-card"><div class="tech-icon">⚡</div><div class="tech-name">XGBoost 3.4</div></div>
+  <div class="tech-card"><div class="tech-icon">📊</div><div class="tech-name">pandas 2.3</div></div>
+  <div class="tech-card"><div class="tech-icon">🔢</div><div class="tech-name">NumPy 2.5</div></div>
+  <div class="tech-card"><div class="tech-icon">⚖️</div><div class="tech-name">imbalanced-learn</div></div>
+  <div class="tech-card"><div class="tech-icon">💾</div><div class="tech-name">joblib 1.6</div></div>
+  <div class="tech-card"><div class="tech-icon">🌐</div><div class="tech-name">Flask 3.1</div></div>
+  <div class="tech-card"><div class="tech-icon">📈</div><div class="tech-name">Chart.js 4.4</div></div>
+</div>
+
+<!-- ── Limitations & Scientific Transparency ── -->
+<div class="section-title">7. Scientific Limitations & Methodological Findings</div>
+<div class="alert-banner warning-banner">
+  <span class="alert-icon">⚠️</span>
+  <strong>Feature-Selection Leakage & Empirical Resolution:</strong>
+  In Step 4 of the original pipeline, feature selection was performed prior to train-test splitting. Our leakage audit (<code>leakage_free_evaluation.py</code>) demonstrated that 90% (27/30) of features are independently identified on training data alone, and accuracy remains above 99.84%.
+  <br><br>
+  <strong>Dataset-Specific Distribution:</strong>
+  Models are trained on synthetic simulated DDoS scenarios from the University of New Brunswick testbed. Real enterprise networks exhibit diverse background traffic noise that may require domain adaptation.
+</div>
+
+{% endblock %}

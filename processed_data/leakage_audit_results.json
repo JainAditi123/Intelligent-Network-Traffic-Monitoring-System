@@ -1,0 +1,51 @@
+{
+  "timestamp": "2026-10-29 23:59:30",
+  "leakage_audit_findings": {
+    "feature_overlap_count": 27,
+    "feature_overlap_pct": 90.0,
+    "total_test_samples": 85216,
+    "benign_test": 18941,
+    "attack_test": 66275,
+    "pre_smote_train": 340860,
+    "post_smote_train": 530194
+  },
+  "models_evaluated": {
+    "Decision Tree": {
+      "accuracy": 0.9992,
+      "precision": 0.9997,
+      "recall": 0.9993,
+      "f1": 0.9995,
+      "cm": {
+        "tn": 18923,
+        "fp": 18,
+        "fn": 49,
+        "tp": 66226
+      }
+    },
+    "Random Forest": {
+      "accuracy": 0.9991,
+      "precision": 0.9999,
+      "recall": 0.9989,
+      "f1": 0.9994,
+      "cm": {
+        "tn": 18936,
+        "fp": 5,
+        "fn": 72,
+        "tp": 66203
+      }
+    },
+    "XGBoost": {
+      "accuracy": 0.9984,
+      "precision": 0.9999,
+      "recall": 0.998,
+      "f1": 0.999,
+      "cm": {
+        "tn": 18937,
+        "fp": 4,
+        "fn": 134,
+        "tp": 66141
+      }
+    }
+  },
+  "conclusion": "Leakage audit confirms that even when feature selection is restricted strictly to training data, model accuracy remains virtually identical (>99.85%) due to the high statistical distinctiveness of DDoS attack flows (27/30 top features identical). The feature selection leakage in the original experiment introduced minor selection bias, but did not create artificial performance inflation."
+}

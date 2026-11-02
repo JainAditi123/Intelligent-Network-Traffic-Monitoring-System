@@ -1,0 +1,25 @@
+# Environments
+venv/
+env/
+.venv/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Large Dataset Files (Raw dumps & Parquets)
+archive (32)/
+archive (32).zip
+processed_data/*.parquet
+processed_data/*.npy
+
+# System & IDE files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log

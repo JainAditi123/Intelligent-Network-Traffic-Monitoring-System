@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Network Traffic Analysis Dashboard{% endblock %}
+
+{% block content %}
+
+<!-- ── Offline Architecture Notice Banner ── -->
+<div class="alert-banner">
+  <span class="alert-icon">ℹ️</span>
+  <strong>Offline Batch Traffic Monitoring Architecture:</strong>
+  All metrics and distributions are derived from the <strong>CIC-DDoS2019</strong> benchmark dataset and the 5 trained ensemble models.
+  Live kernel-level packet sniffing and continuous network interception are marked as planned future scope; this system operates on real flow record batches.
+</div>
+
+<!-- ── Key Dataset Metrics Cards ── -->
+<div class="section-title">Core Dataset Metrics (CIC-DDoS2019)</div>
+<div class="cards-grid four-col">
+  <div class="stat-card">
+    <div class="stat-icon" style="background:#1e3a5f;">📦</div>
+    <div class="stat-value">{{ "{:,}".format(stats.total_cleaned_samples) }}</div>
+    <div class="stat-label">Total Cleaned Flow Records</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon" style="background:#1a3a2a;">🌐</div>
+    <div class="stat-value">{{ stats.attack_types_count }}</div>
+    <div class="stat-label">DDoS Attack Scenarios</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon" style="background:#2a1a3a;">🔬</div>
+    <div class="stat-value">{{ stats.selected_features }}</div>
+    <div class="stat-label">Selected Features (RF Importance)</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon" style="background:#3a1a1a;">📂</div>
+    <div class="stat-value">{{ stats.parquet_files }}</div>
+    <div class="stat-label">Raw Apache Parquet Files</div>
+  </div>
+</div>
+
+<!-- ── Dataset Split Architecture ── -->
+<div class="section-title">Train / Test Split & SMOTE Balancing Verification</div>
+<div class="cards-grid three-col">
+  <div class="stat-card accent-blue">
+    <div class="stat-value">{{ "{:,}".format(stats.train_split_pre_smote) }}</div>
+    <div class="stat-label">Original Train Split (80% Pre-SMOTE)</div>
+    <div class="stat-sub">75,763 Benign (22.2%) / 265,097 Attack (77.8%)</div>
+  </div>
+  <div class="stat-card accent-purple">
+    <div class="stat-value">{{ "{:,}".format(stats.train_samples_post_smote) }}</div>
+    <div class="stat-label">Training Set (Post-SMOTE Balanced)</div>
+    <div class="stat-sub">265,097 Benign (50.0%) / 265,097 Attack (50.0%)</div>
+  </div>
+  <div class="stat-card accent-green">
+    <div class="stat-value">{{ "{:,}".format(stats.test_split_samples) }}</div>
+    <div class="stat-label">Held-out Test Set (20% Isolated)</div>
+    <div class="stat-sub">18,941 Benign (22.2%) / 66,275 Attack (77.8%)</div>
+  </div>
+</div>
+
+<!-- ── Cleaned Class Distribution ── -->
+<div class="section-title">Traffic Class Distribution (Original Cleaned Dataset)</div>
+<div class="cards-grid two-col">
+  <div class="stat-card accent-teal">
+    <div class="stat-value">{{ "{:,}".format(stats.cleaned_benign) }}</div>
+    <div class="stat-label">BENIGN Network Flows ({{ stats.cleaned_benign_pct }}% of Cleaned Data)</div>
+  </div>
+  <div class="stat-card accent-red">
+    <div class="stat-value">{{ "{:,}".format(stats.cleaned_attack) }}</div>
+    <div class="stat-label">DDoS ATTACK Flows ({{ stats.cleaned_attack_pct }}% of Cleaned Data)</div>
+  </div>
+</div>
+
+<!-- ── Five-Model Summary Cards ── -->
+<div class="section-title">Five-Model Experimental Summary (85,216 Held-out Test Samples)</div>
+<div class="cards-grid five-col">
+  {% for r in results %}
+  <div class="model-card" style="border-top: 3px solid {{ r.color }};">
+    <div class="model-icon">{{ r.icon }}</div>
+    <div class="model-name">{{ r.name }}</div>
+    <div class="model-type">{{ r.type }}</div>
+    <div class="model-metric">
+      <span class="metric-label">Accuracy</span>
+      <span class="metric-val" style="color:{{ r.color }};">{{ "%.4f"|format(r.accuracy) }}</span>
+    </div>
+    <div class="model-metric">
+      <span class="metric-label">Precision</span>
+      <span class="metric-val">{{ "%.4f"|format(r.precision) }}</span>
+    </div>
+    <div class="model-metric">
+      <span class="metric-label">Recall</span>
+      <span class="metric-val">{{ "%.4f"|format(r.recall) }}</span>
+    </div>
+    <div class="model-metric">
+      <span class="metric-label">F1-Score</span>
+      <span class="metric-val" style="color:{{ r.color }}; font-weight:700;">{{ "%.4f"|format(r.f1) }}</span>
+    </div>
+    {% if r.name == "Stacking Ensemble" %}
+    <div class="best-badge">★ Highest Accuracy & F1</div>
+    {% elif r.name == "XGBoost" %}
+    <div class="badge-note" style="margin-top:10px; background:#2a1a0a; color:#f4a261; border:1px solid #f4a26155;">Lowest False Alarms (FP=4)</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ── Recent Prediction Session Activity ── -->
+<div class="section-title">Application Session Activity History</div>
+{% if session_history %}
+<div class="table-wrapper">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Batch #</th>
+        <th>Timestamp</th>
+        <th>Source File</th>
+        <th>Total Flows</th>
+        <th>BENIGN</th>
+        <th>ATTACK</th>
+        <th>Attack Ratio</th>
+        <th>Threat Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in session_history %}
+      <tr>
+        <td>#{{ s.id }}</td>
+        <td>{{ s.timestamp }}</td>
+        <td><code>{{ s.filename }}</code></td>
+        <td>{{ s.total_flows }}</td>
+        <td><span class="label-badge label-benign">{{ s.benign_count }}</span></td>
+        <td><span class="label-badge label-attack">{{ s.attack_count }}</span></td>
+        <td>{{ s.attack_pct }}%</td>
+        <td>
+          <span class="status-pill status-{{ s.threat_level.lower() }}">
+            {{ s.threat_level }}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="info-box">
+  No traffic batches processed yet in the current application session.
+  Go to <a href="{{ url_for('predict') }}" style="color:var(--accent); font-weight:bold;">Traffic Prediction</a>
+  to upload a CSV or load a sample network flow batch.
+</div>
+{% endif %}
+
+<!-- ── Pipeline Workflow ── -->
+<div class="section-title">10-Step Reproducible ML Pipeline Workflow</div>
+<div class="pipeline-row">
+  <div class="pipeline-step">
+    <div class="step-num">01</div>
+    <div class="step-name">Dataset Analysis</div>
+    <div class="step-desc">Inspect 17 parquet files</div>
+  </div>
+  <div class="pipeline-arrow">→</div>
+  <div class="pipeline-step">
+    <div class="step-num">02</div>
+    <div class="step-name">Preprocessing</div>
+    <div class="step-desc">Clean nulls & inf values</div>
+  </div>
+  <div class="pipeline-arrow">→</div>
+  <div class="pipeline-step">
+    <div class="step-num">03</div>
+    <div class="step-name">Label Encoding</div>
+    <div class="step-desc">Binary mapping</div>
+  </div>
+  <div class="pipeline-arrow">→</div>
+  <div class="pipeline-step">
+    <div class="step-num">04</div>
+    <div class="step-name">Feature Selection</div>
+    <div class="step-desc">Top 30 features</div>
+  </div>
+  <div class="pipeline-arrow">→</div>
+  <div class="pipeline-step highlight-step">
+    <div class="step-num">05</div>
+    <div class="step-name">Split & Scale</div>
+    <div class="step-desc">StandardScaler & SMOTE</div>
+  </div>
+  <div class="pipeline-arrow">→</div>
+  <div class="pipeline-step">
+    <div class="step-num">06–08</div>
+    <div class="step-name">Base Models</div>
+    <div class="step-desc">DT, RF, XGBoost</div>
+  </div>
+  <div class="pipeline-arrow">→</div>
+  <div class="pipeline-step highlight-step">
+    <div class="step-num">09–10</div>
+    <div class="step-name">Ensemble Learning</div>
+    <div class="step-desc">Voting & Stacking</div>
+  </div>
+</div>
+
+{% endblock %}

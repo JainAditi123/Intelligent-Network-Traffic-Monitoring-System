@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+{% block title %}Traffic Prediction{% endblock %}
+{% block page_title %}Network Traffic Prediction & Threat Detection{% endblock %}
+
+{% block content %}
+
+<!-- ── Model & Verification Notice ── -->
+<div class="alert-banner">
+  <span class="alert-icon">🔬</span>
+  <strong>Offline Batch Traffic Analysis Engine:</strong> Real inference is executed using the fitted <code>StandardScaler</code> and actual trained models
+  (Stacking Ensemble, Random Forest, XGBoost, Voting, or Decision Tree).
+  Predictions and calibrated confidence percentages are computed directly from the model probabilities.
+</div>
+
+<!-- ── Quick-Load Demo Benchmarks ── -->
+<div class="section-title">⚡ Instant Demonstration Benchmarks (1-Click Evaluation)</div>
+<div class="cards-grid three-col" style="margin-bottom: 24px;">
+  <div class="demo-card">
+    <div class="demo-title">🟢 Benign Traffic Sample</div>
+    <div class="demo-desc">10 real uncorrupted normal network flow records from the held-out test partition.</div>
+    <div style="display:flex; gap:8px; margin-top:12px;">
+      <a href="{{ url_for('load_sample', sample_type='benign', model=selected_model) }}" class="btn-demo btn-demo-benign">⚡ Run Benign Test</a>
+      <a href="{{ url_for('download_sample_file', sample_type='benign') }}" class="btn-demo-dl" title="Download CSV">📥 CSV</a>
+    </div>
+  </div>
+  <div class="demo-card">
+    <div class="demo-title">🔴 DDoS Attack Traffic Sample</div>
+    <div class="demo-desc">10 real high-intensity DDoS attack flow records (floods & amplifications) from the test set.</div>
+    <div style="display:flex; gap:8px; margin-top:12px;">
+      <a href="{{ url_for('load_sample', sample_type='attack', model=selected_model) }}" class="btn-demo btn-demo-attack">⚡ Run Attack Test</a>
+      <a href="{{ url_for('download_sample_file', sample_type='attack') }}" class="btn-demo-dl" title="Download CSV">📥 CSV</a>
+    </div>
+  </div>
+  <div class="demo-card">
+    <div class="demo-title">🟡 Mixed Real-World Traffic</div>
+    <div class="demo-desc">25 randomly mixed flows (10 Benign + 15 Attack) simulating a live network batch.</div>
+    <div style="display:flex; gap:8px; margin-top:12px;">
+      <a href="{{ url_for('load_sample', sample_type='mixed', model=selected_model) }}" class="btn-demo btn-demo-mixed">⚡ Run Mixed Test</a>
+      <a href="{{ url_for('download_sample_file', sample_type='mixed') }}" class="btn-demo-dl" title="Download CSV">📥 CSV</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── Upload Form ── -->
+<div class="section-title">Upload Custom Network Traffic CSV</div>
+<form method="POST" enctype="multipart/form-data" class="upload-form" id="predictionForm">
+  <div style="margin-bottom:14px; display:flex; align-items:center; gap:10px; width:100%;">
+    <label for="model_select" style="font-size:0.85rem; color:var(--text-muted); font-weight:600;">Active Classifier Model:</label>
+    <select name="model_select" id="model_select" style="background:var(--bg-card2); color:var(--text-bright); border:1px solid var(--border); padding:7px 12px; border-radius:6px; font-size:0.85rem;">
+      {% for k, v in available_models.items() %}
+      <option value="{{ k }}" {{ 'selected' if selected_model == k else '' }}>{{ v }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="file-drop-zone" id="dropZone">
+    <div class="drop-icon">📁</div>
+    <div class="drop-text">Drag & drop your network flow CSV here, or click to browse</div>
+    <input type="file" name="csv_file" id="csvInput" accept=".csv" class="file-input"/>
+    <div id="fileNameDisplay" class="file-name-display">No custom file selected</div>
+    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:6px;">Supported format: Standard CSV with 30 required flow statistical features (Max 16 MB)</div>
+  </div>
+  <div style="display:flex; gap:12px; align-items:center;">
+    <button type="submit" class="btn-primary" id="submitBtn">
+      🔍 Analyze Traffic & Predict
+    </button>
+    <div id="loadingIndicator" style="display:none; color:var(--accent); font-size:0.9rem;">
+      <span class="spinner"></span> Processing flow features & generating predictions...
+    </div>
+  </div>
+</form>
+
+<!-- ── Required Schema Toggle ── -->
+<details style="margin-bottom:24px; background:var(--bg-card); padding:12px 18px; border-radius:var(--radius); border:1px solid var(--border);">
+  <summary style="cursor:pointer; color:var(--accent); font-weight:600; font-size:0.88rem;">
+    📋 View 30 Required Feature Schema Columns (Exact Trained Order)
+  </summary>
+  <div class="feature-grid" style="margin-top:14px;">
+    {% for name in feature_names %}
+    <div class="feature-chip">{{ loop.index }}. {{ name }}</div>
+    {% endfor %}
+  </div>
+</details>
+
+<!-- ── Error Handling Display ── -->
+{% if error %}
+<div class="error-box">
+  <div class="error-title">⚠️ Validation & Input Error</div>
+  <div class="error-msg">{{ error }}</div>
+  {% if missing_cols %}
+  <div class="missing-cols-title">Missing Schema Columns ({{ missing_cols|length }}):</div>
+  <div class="feature-grid">
+    {% for col in missing_cols %}
+    <div class="feature-chip missing">{{ col }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- ── Prediction Results Section ── -->
+{% if summary and records and not error %}
+<div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
+  <div>
+    Analysis Results: <code>{{ summary.filename }}</code>
+    <span class="row-count">({{ summary.total_records }} total flow record{{ 's' if summary.total_records != 1 else '' }})</span>
+  </div>
+  <a href="{{ url_for('download_predictions') }}" class="btn-primary" style="padding:7px 16px; font-size:0.82rem; text-decoration:none;">
+    📥 Download Predictions CSV
+  </a>
+</div>
+
+<!-- Threat Summary Banner -->
+<div class="threat-banner" style="border-left: 5px solid {{ summary.threat_color }};">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+    <div>
+      <div style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted);">Assessed Threat Posture</div>
+      <div style="font-size:1.3rem; font-weight:800; color:{{ summary.threat_color }}; margin-top:2px;">
+        {{ summary.threat_badge }} ({{ summary.threat_level }})
+      </div>
+    </div>
+    <div style="display:flex; gap:20px; align-items:center;">
+      <div>
+        <span style="font-size:0.82rem; color:var(--text-muted);">Processing Latency: </span>
+        <strong style="color:var(--accent2); font-size:1.05rem;">{{ summary.processing_time }}</strong>
+      </div>
+      <div>
+        <span style="font-size:0.82rem; color:var(--text-muted);">Mean Confidence: </span>
+        <strong style="color:var(--text-bright); font-size:1.05rem;">{{ summary.avg_confidence }}%</strong>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Summary Metrics Cards -->
+<div class="cards-grid four-col" style="margin-top:16px;">
+  <div class="stat-card">
+    <div class="stat-value">{{ summary.total_records }}</div>
+    <div class="stat-label">Total Inspected Flows</div>
+  </div>
+  <div class="stat-card accent-teal">
+    <div class="stat-value">{{ summary.benign_count }}</div>
+    <div class="stat-label">BENIGN Flows ({{ summary.benign_pct }}%)</div>
+  </div>
+  <div class="stat-card accent-red">
+    <div class="stat-value">{{ summary.attack_count }}</div>
+    <div class="stat-label">ATTACK Flows ({{ summary.attack_pct }}%)</div>
+  </div>
+  <div class="stat-card accent-blue">
+    <div class="stat-value">{{ summary.processing_time }}</div>
+    <div class="stat-label">Inference Processing Time</div>
+  </div>
+</div>
+
+<!-- Visual Doughnut & Threat Diagnostics -->
+<div class="charts-row" style="margin-top:20px;">
+  <div class="chart-card" style="display:flex; flex-direction:column; align-items:center; justify-content:center;">
+    <div class="chart-title">Traffic Class Proportion</div>
+    <div style="max-width:240px; max-height:240px; width:100%;">
+      <canvas id="predPieChart"></canvas>
+    </div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Inference Execution Diagnostics</div>
+    <div class="info-row"><span class="info-key">Source File:</span><span class="info-val"><code>{{ summary.filename }}</code></span></div>
+    <div class="info-row"><span class="info-key">Classifier Model:</span><span class="info-val"><strong>{{ summary.model_name }}</strong></span></div>
+    <div class="info-row"><span class="info-key">Latency Elapsed:</span><span class="info-val">{{ summary.processing_time }} ({{ summary.processing_time_ms }} ms)</span></div>
+    <div class="info-row"><span class="info-key">Analysis Timestamp:</span><span class="info-val">{{ summary.timestamp }}</span></div>
+    <div class="info-row"><span class="info-key">Preprocessing:</span><span class="info-val">StandardScaler (Fitted on training partition)</span></div>
+    <div class="info-row"><span class="info-key">Threat Ratio:</span><span class="info-val"><strong style="color:{{ summary.threat_color }};">{{ summary.attack_pct }}% Malicious Flows</strong></span></div>
+  </div>
+</div>
+
+<!-- Detailed Flow Records Table with Filters -->
+<div class="section-title" style="display:flex; justify-content:space-between; align-items:center; margin-top:28px;">
+  <div>Flow Inspection & Input Feature Preview Table</div>
+  <div class="filter-group">
+    <button type="button" class="btn-filter {{ 'active' if filter_type == 'all' else '' }}" onclick="filterRows('all')">All ({{ records|length }})</button>
+    <button type="button" class="btn-filter {{ 'active' if filter_type == 'attack' else '' }}" onclick="filterRows('attack')">🚨 ATTACK Only ({{ summary.attack_count }})</button>
+    <button type="button" class="btn-filter {{ 'active' if filter_type == 'benign' else '' }}" onclick="filterRows('benign')">✅ BENIGN Only ({{ summary.benign_count }})</button>
+  </div>
+</div>
+
+<div class="table-wrapper">
+  <table class="data-table" id="resultsTable">
+    <thead>
+      <tr>
+        <th>Flow #</th>
+        <th>Prediction</th>
+        <th>Confidence</th>
+        <th>Attack Prob</th>
+        <th>Benign Prob</th>
+        <th>Flow Duration</th>
+        <th>Flow Pkts/s</th>
+        <th>Fwd Pkts</th>
+        <th>Bwd Pkts</th>
+        <th>Protocol</th>
+        <th>Pkt Max Len</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in records %}
+      <tr class="flow-row {{ 'attack-row' if r.is_attack else 'benign-row' }}" data-type="{{ 'attack' if r.is_attack else 'benign' }}">
+        <td>#{{ r.row_id }}</td>
+        <td>
+          <span class="label-badge {{ 'label-attack' if r.is_attack else 'label-benign' }}">
+            {{ '🚨 ATTACK' if r.is_attack else '✅ BENIGN' }}
+          </span>
+        </td>
+        <td>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div class="confidence-bar-bg">
+              <div class="confidence-bar-fill" style="width: {{ r.confidence }}%; background: {{ '#f72585' if r.is_attack else '#00d4aa' }};"></div>
+            </div>
+            <strong>{{ "%.2f"|format(r.confidence) }}%</strong>
+          </div>
+        </td>
+        <td>{{ "%.2f"|format(r.attack_prob) }}%</td>
+        <td>{{ "%.2f"|format(r.benign_prob) }}%</td>
+        <td>{{ "{:,.0f}".format(r.flow_duration) }} µs</td>
+        <td>{{ "{:,.1f}".format(r.flow_packets_s) }}</td>
+        <td>{{ r.fwd_pkts }}</td>
+        <td>{{ r.bwd_pkts }}</td>
+        <td><span class="type-tag">{{ 'TCP (6)' if r.protocol == 6 else ('UDP (17)' if r.protocol == 17 else r.protocol) }}</span></td>
+        <td>{{ "{:,.0f}".format(r.packet_length_max) }} B</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// File Input Handling
+const csvInput = document.getElementById('csvInput');
+const fileNameDisplay = document.getElementById('fileNameDisplay');
+if (csvInput) {
+  csvInput.addEventListener('change', function() {
+    fileNameDisplay.textContent = this.files[0] ? this.files[0].name : 'No file selected';
+  });
+}
+
+// Drag & drop
+const dz = document.getElementById('dropZone');
+if (dz && csvInput) {
+  dz.addEventListener('click', (e) => {
+    if (e.target !== csvInput) csvInput.click();
+  });
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault();
+    dz.classList.remove('dragover');
+    if (e.dataTransfer.files.length) {
+      csvInput.files = e.dataTransfer.files;
+      fileNameDisplay.textContent = e.dataTransfer.files[0].name;
+    }
+  });
+}
+
+// Form submit spinner
+const predForm = document.getElementById('predictionForm');
+if (predForm) {
+  predForm.addEventListener('submit', function() {
+    document.getElementById('loadingIndicator').style.display = 'inline-block';
+    document.getElementById('submitBtn').disabled = true;
+    document.getElementById('submitBtn').style.opacity = '0.6';
+  });
+}
+
+// Client-side row filtering
+function filterRows(type) {
+  const rows = document.querySelectorAll('.flow-row');
+  const buttons = document.querySelectorAll('.btn-filter');
+  buttons.forEach(b => b.classList.remove('active'));
+  
+  if (event && event.target) {
+    event.target.classList.add('active');
+  }
+
+  rows.forEach(r => {
+    if (type === 'all') {
+      r.style.display = '';
+    } else {
+      r.style.display = (r.getAttribute('data-type') === type) ? '' : 'none';
+    }
+  });
+}
+
+// Doughnut Chart Rendering
+{% if summary and summary.total_records > 0 %}
+document.addEventListener('DOMContentLoaded', function() {
+  const ctx = document.getElementById('predPieChart');
+  if (ctx) {
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['BENIGN (Normal)', 'ATTACK (DDoS)'],
+        datasets: [{
+          data: [{{ summary.benign_count }}, {{ summary.attack_count }}],
+          backgroundColor: ['#00d4aa', '#f72585'],
+          borderColor: '#112240',
+          borderWidth: 3,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { color: '#c8d6e5', boxWidth: 14 }
+          }
+        }
+      }
+    });
+  }
+});
+{% endif %}
+</script>
+{% endblock %}
